@@ -89,7 +89,7 @@
         .attr('class', 'panel-collapse collapse')
         .classed('in', function (d) {
           if (window.localStorage) {
-            return localStorage.getItem('collapse' + d.index);
+            return !!localStorage.getItem('collapse' + d.index);
           }
           return false;
         })
