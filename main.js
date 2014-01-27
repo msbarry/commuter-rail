@@ -44,7 +44,7 @@
           var dir = inbound ? 'inbound' : 'outbound';
           schedules[num - 1][dir].push({
             stop: msg.Stop,
-            time: +msg.Scheduled * 1000,
+            time: (+msg.Scheduled + +msg.Lateness) * 1000,
             lateness: +msg.Lateness,
             id: msg.Stop + msg.Trip,
             dest: msg.Destination,
