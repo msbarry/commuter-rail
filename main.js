@@ -87,6 +87,12 @@
       .append('div')
         .attr('id', function (d) { return 'collapse' + d.index; })
         .attr('class', 'panel-collapse collapse')
+        .classed('in', function (d) {
+          if (window.localStorage) {
+            return localStorage.getItem('collapse' + d.index);
+          }
+          return false;
+        })
       .append('div')
         .attr('class', 'panel-body container')
         .attr('id', function (d) { return 'body' + d.index; });
@@ -148,4 +154,17 @@
     var dy = pos[1] - b[1];
     return dx * dx + dy * dy;
   }
+
+  $(document).on('show.bs.collapse', function (d) {
+    if (window.localStorage) {
+      var open = $(d.target).attr('id');
+      localStorage.setItem(open, true);
+    }
+  });
+  $(document).on('hide.bs.collapse', function (d) {
+    if (window.localStorage) {
+      var open = $(d.target).attr('id');
+      localStorage.setItem(open, false);
+    }
+  });
 }());
