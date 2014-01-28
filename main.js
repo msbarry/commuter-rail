@@ -48,7 +48,7 @@
           var dir = inbound ? 'inbound' : 'outbound';
           var time = (+msg.Scheduled + (+msg.Lateness)) * 1000;
           if (msg.Flag === 'app') {
-            time = (+msg.TimeStamp + 120) * 1000;
+            time = (+msg.TimeStamp + 60) * 1000;
           } else if (msg.Flag === 'arr') {
             time = (+msg.TimeStamp) * 1000;
           } else if (msg.Flag === 'dep') {

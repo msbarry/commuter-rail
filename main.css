@@ -14,10 +14,10 @@ dd {
 .pre { color: inherit; }
 /* Approaching the station now. Record has vehicle location but not lateness.  */
 .app { color: inherit; }
-.app:after { content: ' (app)'; }
+.app:after { content: ' (approaching)'; }
 /* Arriving at the station now. Record has vehicle location but not lateness.  */
 .arr { color: inherit; }
-.arr:after { content: ' (arr)'; }
+.arr:after { content: ' (boarding)'; }
 /* Departing the station now or has departed the station. Record has vehicle location but not lateness. Used at the trip’s origin.  */
 .dep { color: inherit; }
 .dep:after { content: ' (departing)'; }
