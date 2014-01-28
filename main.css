@@ -1,2 +1,13 @@
 /* Add styles here */
 
+dl {
+  margin-bottom: 0.5em;
+}
+
+.dl-horizontal dt {
+  width: 180px;
+}
+
+.dl-horizontal dd {
+  margin-left: 190px;
+}

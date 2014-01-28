@@ -13,6 +13,7 @@
     'Haverhill Line',
     'Newburyport/Rockport Line'
   ];
+  var CLOSEST_TO_SHOW = 3;
   var schedules = LINES.map(function (line, i) {
     return {
       name: line,
@@ -23,6 +24,8 @@
   });
   var stationOrder = [];
   var stopOrders = {};
+  var closest = [];
+  var sourceToDestList = {};
 
   /**
    * Request current locations from the MBTA
@@ -39,12 +42,21 @@
       var body = JSON.parse(data[0].body);
       if (body.Messages) {
         schedules[num - 1].trains = [];
+        var alreadyHit = {};
         body.Messages.forEach(function (msg) {
           var inbound = msg.Destination === 'South Station' || msg.Destionation === 'North Station';
           var dir = inbound ? 'inbound' : 'outbound';
+          var time = (+msg.Scheduled + (+msg.Lateness)) * 1000;
+          sourceToDestList[msg.Stop] = sourceToDestList[msg.Stop] || {};
+          if (!alreadyHit[msg.Stop + "-" + msg.Destination]) {
+            alreadyHit[msg.Stop + "-" + msg.Destination] = true;
+            sourceToDestList[msg.Stop][msg.Destination] = [];
+          }
+          sourceToDestList[msg.Stop][msg.Destination].push(time);
+
           schedules[num - 1][dir].push({
             stop: msg.Stop,
-            time: (+msg.Scheduled + +msg.Lateness) * 1000,
+            time: time,
             lateness: +msg.Lateness,
             id: msg.Stop + msg.Trip,
             dest: msg.Destination,
@@ -70,33 +82,9 @@
     var newOuterPanel = outerPanel
         .enter()
       .append('div')
-        .attr('class', 'panel panel-default');
-    
-    newOuterPanel
-      .append('div')
-        .attr('class', 'panel-heading')
-      .append('h4')
-        .attr('class', 'panel-title')
-      .append('a')
-        .attr('data-toggle', 'collapse')
-        .attr('data-parent', '#accordian')
-        .attr('href', function (d) { return '#collapse' + d.index; })
-        .text(function (d) { return d.name; });
+        .call(bootstrapCollapsePanel(function (d) { return d.index; }, function (d) { return d.name; }));
 
-    var body = newOuterPanel
-      .append('div')
-        .attr('id', function (d) { return 'collapse' + d.index; })
-        .attr('class', 'panel-collapse collapse')
-        .classed('in', function (d) {
-          if (window.localStorage) {
-            return !!localStorage.getItem('collapse' + d.index);
-          }
-          return false;
-        })
-      .append('div')
-        .attr('class', 'panel-body container')
-        .attr('id', function (d) { return 'body' + d.index; });
-
+    var body = newOuterPanel.selectAll('.panel-body');
     body.append('div')
         .attr('class', 'col-sm-6 inbound')
       .append('h4')
@@ -126,9 +114,46 @@
 
     renderTrains('inbound');
     renderTrains('outbound');
+
+    var closeSections = d3.select('#closest').selectAll('.close-station')
+        .data(closest, function (d) { return d; });
+    closeSections
+        .enter()
+      .append('div')
+        .call(bootstrapCollapsePanel(function (d) { return d.replace(/\s*/g, ''); }, function (d) { return d; }))
+        .classed('close-station', true);
+    closeSections.exit().remove();
+
+    function toPairs(object) {
+      if (!object) { return []; }
+      var keys = Object.keys(object);
+      return keys.map(function (k) {
+        return [k, object[k]];
+      });
+    }
+
+    // destination, next, next
+    var displays = d3.selectAll('.close-station .panel-body').selectAll('.dest')
+        .data(function (d) { return toPairs(sourceToDestList[d]).filter(function (d2) { return d !== d2[0]; }); }, function (d) { return d[0]; });
+    displays.enter().append('dl')
+        .attr('class', 'dest dl-horizontal')
+      .append('dt')
+        .text(function (d) { return d[0]; });
+    displays.exit().remove();
+
+    var times = displays.selectAll('.time')
+        .data(function (d) { return d[1].slice(0, 2); })
+        .sort(function (a, b) {
+          return d3.ascending(a, b);
+        });
+    times.enter().append('dd')
+        .attr('class', 'time');
+    times.exit().remove();
+    displays.selectAll('.time').text(function (d) { return moment(d).fromNow(); });
   }());
 
   d3.csv('StationOrder.csv', function (d) {
+    var stopLocations = {};
     setTimeout(poll);
     stationOrder = d;
 
@@ -138,21 +163,51 @@
       var stop = d.stop_id;
       stopOrders[route + '|' + dir + '|' + stop] = +d.stop_sequence;
       d.dir = dir;
+      stopLocations[stop] = [+d.stop_lat, +d.stop_lon];
     });
-    navigator.geolocation.getCurrentPosition(function (p) {
+    navigator.geolocation.watchPosition(function (p) {
       var location = [p.coords.latitude, p.coords.longitude];
-      d.sort(function (a, b) {
-        return d3.ascending(distance(a, location), distance(b, location));
-      });
-      console.log("Your closest stops are " + d.slice(0, 5).map(function (d) { return d.stop_id + " " + d.dir; }));
+      closest = Object.keys(stopLocations).sort(function (a, b) {
+        return d3.ascending(distance(stopLocations[a], location), distance(stopLocations[b], location));
+      }).slice(0, CLOSEST_TO_SHOW);
     });
   });
 
   function distance(a, b) {
-    var pos = [+a.stop_lat, +a.stop_lon];
-    var dx = pos[0] - b[0];
-    var dy = pos[1] - b[1];
+    var dx = a[0] - b[0];
+    var dy = a[1] - b[1];
     return dx * dx + dy * dy;
+  }
+
+
+  function bootstrapCollapsePanel(idGenerator, nameGenerator) {
+    return function (newOuterPanel) {
+      newOuterPanel
+          .attr('class', 'panel panel-default')
+        .append('div')
+          .attr('class', 'panel-heading')
+        .append('h4')
+          .attr('class', 'panel-title')
+        .append('a')
+          .attr('data-toggle', 'collapse')
+          .attr('data-parent', '#accordian')
+          .attr('href', function (d, i) { return '#collapse' + idGenerator(d, i); })
+          .text(function (d, i) { return nameGenerator(d, i); });
+
+      newOuterPanel
+        .append('div')
+          .attr('id', function (d, i) { return 'collapse' + idGenerator(d, i); })
+          .attr('class', 'panel-collapse collapse')
+          .classed('in', function (d, i) {
+            if (window.localStorage) {
+              return 'true' === localStorage.getItem('collapse' + idGenerator(d, i));
+            }
+            return false;
+          })
+        .append('div')
+          .attr('class', 'panel-body container')
+          .attr('id', function (d, i) { return 'body' + idGenerator(d, i); });
+    };
   }
 
   $(document).on('show.bs.collapse', function (d) {
