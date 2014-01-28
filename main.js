@@ -47,21 +47,32 @@
           var inbound = msg.Destination === 'South Station' || msg.Destionation === 'North Station';
           var dir = inbound ? 'inbound' : 'outbound';
           var time = (+msg.Scheduled + (+msg.Lateness)) * 1000;
+          if (msg.Flag === 'app') {
+            time = (+msg.TimeStamp + 120) * 1000;
+          } else if (msg.Flag === 'arr') {
+            time = (+msg.TimeStamp) * 1000;
+          } else if (msg.Flag === 'dep') {
+            time = (+msg.TimeStamp - 60) * 1000;
+          }
+          if ((+msg.TimeStamp * 1000) - (time) > 300000) {
+            return;
+          }
           sourceToDestList[msg.Stop] = sourceToDestList[msg.Stop] || {};
           if (!alreadyHit[msg.Stop + "-" + msg.Destination]) {
             alreadyHit[msg.Stop + "-" + msg.Destination] = true;
             sourceToDestList[msg.Stop][msg.Destination] = [];
           }
-          sourceToDestList[msg.Stop][msg.Destination].push(time);
-
-          schedules[num - 1][dir].push({
+          var record = {
             stop: msg.Stop,
             time: time,
             lateness: +msg.Lateness,
             id: msg.Stop + msg.Trip,
+            flag: msg.Flag,
             dest: msg.Destination,
             order: stopOrders[LINES[num - 1] + '|' + dir + '|' + msg.Stop]
-          });
+          };
+          sourceToDestList[msg.Stop][msg.Destination].push(record);
+          schedules[num - 1][dir].push(record);
         });
       }
     });
@@ -120,7 +131,7 @@
     closeSections
         .enter()
       .append('div')
-        .call(bootstrapCollapsePanel(function (d) { return d.replace(/\s*/g, ''); }, function (d) { return d; }))
+        .call(bootstrapCollapsePanel(function (d) { return d.replace(/[^a-zA-Z]*/g, ''); }, function (d) { return d; }))
         .classed('close-station', true);
     closeSections.exit().remove();
 
@@ -144,12 +155,20 @@
     var times = displays.selectAll('.time')
         .data(function (d) { return d[1].slice(0, 2); })
         .sort(function (a, b) {
-          return d3.ascending(a, b);
+          return d3.ascending(a.time, b.time);
         });
     times.enter().append('dd')
         .attr('class', 'time');
     times.exit().remove();
-    displays.selectAll('.time').text(function (d) { return moment(d).fromNow(); });
+    displays.selectAll('.time').text(function (d) {
+      var diff = moment(d.time).fromNow();
+      if (d.lateness) {
+        diff += " (" + moment.duration(d.lateness, 'seconds').humanize() + " late)";
+      }
+      return diff;
+    }).attr('class', function (d) {
+      return 'time ' + d.flag;
+    });
   }());
 
   d3.csv('StationOrder.csv', function (d) {

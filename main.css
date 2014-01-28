@@ -7,3 +7,20 @@ dl {
 dd {
   margin-left: 1em;
 }
+
+/* Record has scheduled time but not the vehicle lateness. May have vehicle ID and position. */
+.sch { color: #777; }
+/* Record has scheduled time and the vehicle’s current lateness and position.  */
+.pre { color: inherit; }
+/* Approaching the station now. Record has vehicle location but not lateness.  */
+.app { color: inherit; }
+.app:after { content: ' (app)'; }
+/* Arriving at the station now. Record has vehicle location but not lateness.  */
+.arr { color: inherit; }
+.arr:after { content: ' (arr)'; }
+/* Departing the station now or has departed the station. Record has vehicle location but not lateness. Used at the trip’s origin.  */
+.dep { color: inherit; }
+.dep:after { content: ' (departing)'; }
+/* Delayed. Vehicle is late and is not moving. The lateness may or may not be included.  */
+.del { color: #a94442; }
+.del:after { content: ' (delayed)'; }
