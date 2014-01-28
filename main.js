@@ -162,6 +162,11 @@
     times.exit().remove();
     displays.selectAll('.time').text(function (d) {
       var diff = moment(d.time).fromNow();
+      if (d.flag === 'arr') {
+        return 'boarding now';
+      } else if (d.flag === 'app') {
+        return 'approaching station';
+      }
       if (d.lateness) {
         diff += " (" + moment.duration(d.lateness, 'seconds').humanize() + " late)";
       }
