@@ -22,7 +22,6 @@
       index: i
     };
   });
-  var stationOrder = [];
   var stopOrders = {};
   var closest = [];
   var sourceToDestList = {};
@@ -176,25 +175,22 @@
     });
   }());
 
-  d3.csv('StationOrder.csv', function (d) {
-    var stopLocations = {};
-    setTimeout(poll);
-    stationOrder = d;
+  var stopLocations = {};
+  setTimeout(poll);
 
-    d.forEach(function (d) {
-      var dir = +d.direction_id ? 'inbound' : 'outbound';
-      var route = d.route_long_name;
-      var stop = d.stop_id;
-      stopOrders[route + '|' + dir + '|' + stop] = +d.stop_sequence;
-      d.dir = dir;
-      stopLocations[stop] = [+d.stop_lat, +d.stop_lon];
-    });
-    navigator.geolocation.watchPosition(function (p) {
-      var location = [p.coords.latitude, p.coords.longitude];
-      closest = Object.keys(stopLocations).sort(function (a, b) {
-        return d3.ascending(distance(stopLocations[a], location), distance(stopLocations[b], location));
-      }).slice(0, CLOSEST_TO_SHOW);
-    });
+  window.stations.forEach(function (d) {
+    var dir = +d.direction_id ? 'inbound' : 'outbound';
+    var route = d.route_long_name;
+    var stop = d.stop_id;
+    stopOrders[route + '|' + dir + '|' + stop] = +d.stop_sequence;
+    d.dir = dir;
+    stopLocations[stop] = [+d.stop_lat, +d.stop_lon];
+  });
+  navigator.geolocation.watchPosition(function (p) {
+    var location = [p.coords.latitude, p.coords.longitude];
+    closest = Object.keys(stopLocations).sort(function (a, b) {
+      return d3.ascending(distance(stopLocations[a], location), distance(stopLocations[b], location));
+    }).slice(0, CLOSEST_TO_SHOW);
   });
 
   function distance(a, b) {
