@@ -136,9 +136,9 @@
     var displays = d3.selectAll('.close-station .panel-body').selectAll('.dest')
         .data(function (d) { return toPairs(sourceToDestList[d]).filter(function (d2) { return d !== d2[0]; }); }, function (d) { return d[0]; });
     displays.enter().append('dl')
-        .attr('class', 'dest dl-horizontal')
+        .attr('class', 'dest')
       .append('dt')
-        .text(function (d) { return d[0]; });
+        .text(function (d) { return 'To ' + d[0]; });
     displays.exit().remove();
 
     var times = displays.selectAll('.time')
