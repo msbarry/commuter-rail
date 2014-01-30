@@ -1,4 +1,5 @@
-(function () {
+(function ($) {
+  "use strict";
   var LINES = [
     'Greenbush Line',
     'Kingston/Plymouth Line',
@@ -13,7 +14,7 @@
     'Haverhill Line',
     'Newburyport/Rockport Line'
   ];
-  var CLOSEST_TO_SHOW = 3;
+  var CLOSEST_TO_SHOW = 5;
   var schedules = LINES.map(function (line, i) {
     return {
       name: line,
@@ -80,59 +81,65 @@
   /**
    * Render the locations on the page, and update countdowns
    */
-  (function draw () {
+  function draw () {
     setTimeout(draw, 1000);
-    var outerPanel = d3.select('#accordion')
-        .selectAll('div')
-        .data(
-          schedules.filter(function (d) { return d.inbound.length || d.outbound.length; }),
-          function (d) { return d.name; }
-        );
+    // var outerPanel = d3.select('#accordion')
+    //     .selectAll('div')
+    //     .data(
+    //       schedules.filter(function (d) { return d.inbound.length || d.outbound.length; }),
+    //       function (d) { return d.name; }
+    //     );
 
-    var newOuterPanel = outerPanel
-        .enter()
-      .append('div')
-        .call(bootstrapCollapsePanel(function (d) { return d.index; }, function (d) { return d.name; }));
+    // var newOuterPanel = outerPanel
+    //     .enter()
+    //   .append('div')
+    //     .call(bootstrapCollapsePanel(function (d) { return d.index; }, function (d) { return d.name; }));
 
-    var body = newOuterPanel.selectAll('.panel-body');
-    body.append('div')
-        .attr('class', 'col-sm-6 inbound')
-      .append('h4')
-        .text('Inbound');
-    body.append('div')
-        .attr('class', 'col-sm-6 outbound')
-      .append('h4')
-        .text('Outbound');
+    // var body = newOuterPanel.selectAll('.panel-body');
+    // body.append('div')
+    //     .attr('class', 'col-sm-6 inbound')
+    //   .append('h4')
+    //     .text('Inbound');
+    // body.append('div')
+    //     .attr('class', 'col-sm-6 outbound')
+    //   .append('h4')
+    //     .text('Outbound');
 
-    // outerPanel.exit().remove();
+    // // outerPanel.exit().remove();
 
 
-    function renderTrains(dir) {
-      var trains = d3.selectAll('.panel-body .' + dir).selectAll('p')
-          .data(function (d) { return d[dir]; }, function (d) { return d.id; })
-          .sort(function (a, b) {
-            return d3.ascending(a.order, b.order) || d3.ascending(a.time, b.time);
-          })
-          .text(function (d) { return d.stop + ': ' + moment(d.time).fromNow(); });
+    // function renderTrains(dir) {
+    //   var trains = d3.selectAll('.panel-body .' + dir).selectAll('p')
+    //       .data(function (d) { return d[dir]; }, function (d) { return d.id; })
+    //       .sort(function (a, b) {
+    //         return d3.ascending(a.order, b.order) || d3.ascending(a.time, b.time);
+    //       })
+    //       .text(function (d) { return d.stop + ': ' + moment(d.time).fromNow(); });
 
-      trains.enter()
-        .append('p')
-          .text(function (d) { return d.stop + ': ' + moment(d.time).fromNow(); });
+    //   trains.enter()
+    //     .append('p')
+    //       .text(function (d) { return d.stop + ': ' + moment(d.time).fromNow(); });
 
-      trains.exit().remove();
-    }
+    //   trains.exit().remove();
+    // }
 
-    renderTrains('inbound');
-    renderTrains('outbound');
+    // renderTrains('inbound');
+    // renderTrains('outbound');
 
     var closeSections = d3.select('#closest').selectAll('.close-station')
-        .data(closest, function (d) { return d; });
+        .data(closest, function (d) { return d.name; });
     closeSections
         .enter()
       .append('div')
-        .call(bootstrapCollapsePanel(function (d) { return d.replace(/[^a-zA-Z]*/g, ''); }, function (d) { return d; }))
+        .call(bootstrapCollapsePanel(
+          function (d) { return d.name.replace(/[^a-zA-Z]*/g, ''); },
+          function (d) { return d.name; },
+          '#closest'))
         .classed('close-station', true);
     closeSections.exit().remove();
+
+    d3.selectAll('.close-station')
+        .sort(function (a, b) { return d3.ascending(a.dist, b.dist); });
 
     function toPairs(object) {
       if (!object) { return []; }
@@ -144,7 +151,7 @@
 
     // destination, next, next
     var displays = d3.selectAll('.close-station .panel-body').selectAll('.dest')
-        .data(function (d) { return toPairs(sourceToDestList[d]).filter(function (d2) { return d !== d2[0]; }); }, function (d) { return d[0]; });
+        .data(function (d) { return toPairs(sourceToDestList[d.name]).filter(function (d2) { return d !== d2[0]; }); }, function (d) { return d[0]; });
     displays.enter().append('dl')
         .attr('class', 'dest')
       .append('dt')
@@ -173,7 +180,7 @@
     }).attr('class', function (d) {
       return 'time ' + d.flag;
     });
-  }());
+  }
 
   var stopLocations = {};
   setTimeout(poll);
@@ -186,12 +193,24 @@
     d.dir = dir;
     stopLocations[stop] = [+d.stop_lat, +d.stop_lon];
   });
-  navigator.geolocation.watchPosition(function (p) {
+
+  function plotCoord(p) {
     var location = [p.coords.latitude, p.coords.longitude];
-    closest = Object.keys(stopLocations).sort(function (a, b) {
-      return d3.ascending(distance(stopLocations[a], location), distance(stopLocations[b], location));
+    var locationsWithDistance = Object.keys(stopLocations).map(function (stop) {
+      return {
+        name: stop,
+        dist: distance(stopLocations[stop], location)
+      };
+    });
+    closest = locationsWithDistance.sort(function (a, b) {
+      return d3.ascending(a.dist, b.dist);
     }).slice(0, CLOSEST_TO_SHOW);
-  });
+    if (window.localStorage) {
+      localStorage.setItem("loc", JSON.stringify(p));
+    }
+  }
+
+  navigator.geolocation.watchPosition(plotCoord);
 
   function distance(a, b) {
     var dx = a[0] - b[0];
@@ -210,7 +229,6 @@
           .attr('class', 'panel-title')
         .append('a')
           .attr('data-toggle', 'collapse')
-          .attr('data-parent', '#accordian')
           .attr('href', function (d, i) { return '#collapse' + idGenerator(d, i); })
           .text(function (d, i) { return nameGenerator(d, i); });
 
@@ -242,4 +260,13 @@
       localStorage.setItem(open, false);
     }
   });
-}());
+  if (window.localStorage) {
+    try {
+      var pos = localStorage.getItem("loc");
+      if (pos) {
+        plotCoord(JSON.parse(pos));
+      }
+    } catch (e) {}
+  }
+  draw();
+}(window.jQuery));
