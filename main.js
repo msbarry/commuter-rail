@@ -14,7 +14,7 @@
     'Haverhill Line',
     'Newburyport/Rockport Line'
   ];
-  var CLOSEST_TO_SHOW = 5;
+  var CLOSEST_TO_SHOW = 6;
   var schedules = LINES.map(function (line, i) {
     return {
       name: line,
@@ -26,7 +26,9 @@
   var stopOrders = {};
   var closest = [];
   var sourceToDestList = {};
+  var EARTH_RADIUS = 6371000 / 1609; // determines unit of distance, use miles
 
+  setInterval(draw, 1000);
   /**
    * Request current locations from the MBTA
    */
@@ -69,7 +71,9 @@
             id: msg.Stop + msg.Trip,
             flag: msg.Flag,
             dest: msg.Destination,
-            order: stopOrders[LINES[num - 1] + '|' + dir + '|' + msg.Stop]
+            order: stopOrders[LINES[num - 1] + '|' + dir + '|' + msg.Stop],
+            pos: [+msg.Latitude, +msg.Longitude],
+            heading: +msg.Heading
           };
           sourceToDestList[msg.Stop][msg.Destination].push(record);
           schedules[num - 1][dir].push(record);
@@ -82,7 +86,6 @@
    * Render the locations on the page, and update countdowns
    */
   function draw () {
-    setTimeout(draw, 1000);
     // var outerPanel = d3.select('#accordion')
     //     .selectAll('div')
     //     .data(
@@ -138,6 +141,13 @@
         .classed('close-station', true);
     closeSections.exit().remove();
 
+    d3.selectAll('.distance')
+        .text(function (d) {
+          var miles = Math.round(d.dist * 10) / 10;
+          var feet = Math.round(d.dist * 5280 / 10) * 10;
+          return feet <= 1000 ? (feet + " ft") : (miles + " mi");
+        });
+
     d3.selectAll('.close-station')
         .sort(function (a, b) { return d3.ascending(a.dist, b.dist); });
 
@@ -169,7 +179,9 @@
     displays.selectAll('.time').text(function (d) {
       var diff = moment(d.time).fromNow();
       if (d.flag === 'arr') {
-        return 'boarding now';
+        var dist = distance(d.pos, stopLocations[d.stop]);
+        var movingAway = !isApproaching(d.pos, stopLocations[d.stop], d.heading);
+        return (dist > 0.1 && movingAway ? 'left station' : 'boarding now');
       } else if (d.flag === 'app') {
         return 'approaching station';
       }
@@ -212,25 +224,59 @@
 
   navigator.geolocation.watchPosition(plotCoord);
 
-  function distance(a, b) {
-    var dx = a[0] - b[0];
-    var dy = a[1] - b[1];
-    return dx * dx + dy * dy;
+  function distance(aIn, bIn) {
+    var a = aIn.map(toRad);
+    var b = bIn.map(toRad);
+    var dLat = (a[0] - b[0]);
+    var dLon = (a[1] - b[1]) * Math.cos((a[0] + b[0]) / 2);
+    var result = Math.sqrt(dLat * dLat + dLon * dLon) * EARTH_RADIUS;
+    return result;
+  }
+
+  function toRad(deg) {
+    return deg * Math.PI / 180;
+  }
+
+  function toDeg(rad) {
+    return (360 + rad * 180 / Math.PI) % 360;
+  }
+
+  function heading(a, b) {
+    var aRads = a.map(toRad);
+    var bRads = b.map(toRad);
+    var dLon = bRads[1] - aRads[1];
+    var lat1 = aRads[0];
+    var lat2 = bRads[0];
+    var y = Math.sin(dLon) * Math.cos(lat2);
+    var x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+    return toDeg(Math.atan2(y, x));
+  }
+
+  function isApproaching(a, b, trainDir) {
+    var dirTo = heading(a, b);
+    var diff = (360 + trainDir - dirTo) % 360;
+    var normalized = diff > 180 ? diff - 360 : diff;
+    var normalizedDiff = Math.abs(normalized);
+    return normalizedDiff < 90;
   }
 
 
   function bootstrapCollapsePanel(idGenerator, nameGenerator) {
     return function (newOuterPanel) {
-      newOuterPanel
+      var header = newOuterPanel
           .attr('class', 'panel panel-default')
         .append('div')
           .attr('class', 'panel-heading')
         .append('h4')
-          .attr('class', 'panel-title')
-        .append('a')
+          .attr('class', 'panel-title');
+
+      header.append('a')
           .attr('data-toggle', 'collapse')
           .attr('href', function (d, i) { return '#collapse' + idGenerator(d, i); })
           .text(function (d, i) { return nameGenerator(d, i); });
+
+      header.append('span')
+          .attr('class', 'distance text-muted pull-right');
 
       newOuterPanel
         .append('div')
