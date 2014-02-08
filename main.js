@@ -130,7 +130,7 @@
     // renderTrains('outbound');
 
     var closeSections = d3.select('#closest').selectAll('.close-station')
-        .data(closest, function (d) { return d.name; });
+        .data(closest, function (d) { return d.name + d.dist; });
     closeSections
         .enter()
       .append('div')
@@ -140,13 +140,6 @@
           '#closest'))
         .classed('close-station', true);
     closeSections.exit().remove();
-
-    d3.selectAll('.distance')
-        .text(function (d) {
-          var miles = Math.round(d.dist * 10) / 10;
-          var feet = Math.round(d.dist * 5280 / 10) * 10;
-          return feet <= 1000 ? (feet + " ft") : (miles + " mi");
-        });
 
     d3.selectAll('.close-station')
         .sort(function (a, b) { return d3.ascending(a.dist, b.dist); });
@@ -192,6 +185,14 @@
     }).attr('class', function (d) {
       return 'time ' + d.flag;
     });
+    
+
+    d3.selectAll('.distance')
+        .text(function (d) {
+          var miles = Math.round(d.dist * 10) / 10;
+          var feet = Math.round(d.dist * 5280 / 10) * 10;
+          return feet <= 1000 ? (feet + " ft") : (miles + " mi");
+        });
   }
 
   var stopLocations = {};
