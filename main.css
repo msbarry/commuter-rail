@@ -8,6 +8,10 @@ dd {
   margin-left: 1em;
 }
 
+small {
+  color: #999;
+}
+
 /* Record has scheduled time but not the vehicle lateness. May have vehicle ID and position. */
 .sch { color: #777; }
 /* Record has scheduled time and the vehicle’s current lateness and position.  */

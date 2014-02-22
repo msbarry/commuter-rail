@@ -45,6 +45,7 @@
       if (body.Messages) {
         schedules[num - 1].trains = [];
         var alreadyHit = {};
+        var deduper = {};
         body.Messages.forEach(function (msg) {
           var inbound = msg.Destination === 'South Station' || msg.Destionation === 'North Station';
           var dir = inbound ? 'inbound' : 'outbound';
@@ -64,19 +65,22 @@
             alreadyHit[msg.Stop + "-" + msg.Destination] = true;
             sourceToDestList[msg.Stop][msg.Destination] = [];
           }
-          var record = {
-            stop: msg.Stop,
-            time: time,
-            lateness: +msg.Lateness,
-            id: msg.Stop + msg.Trip,
-            flag: msg.Flag,
-            dest: msg.Destination,
-            order: stopOrders[LINES[num - 1] + '|' + dir + '|' + msg.Stop],
-            pos: [+msg.Latitude, +msg.Longitude],
-            heading: +msg.Heading
-          };
-          sourceToDestList[msg.Stop][msg.Destination].push(record);
-          schedules[num - 1][dir].push(record);
+          if (!deduper[msg.Stop + "-" + msg.Destination + "-" + msg.Vehicle]) {
+            deduper[msg.Stop + "-" + msg.Destination + "-" + msg.Vehicle] = true;
+            var record = {
+              stop: msg.Stop,
+              time: time,
+              lateness: +msg.Lateness,
+              id: msg.Stop + msg.Trip,
+              flag: msg.Flag,
+              dest: msg.Destination,
+              order: stopOrders[LINES[num - 1] + '|' + dir + '|' + msg.Stop],
+              pos: [+msg.Latitude, +msg.Longitude],
+              heading: +msg.Heading
+            };
+            sourceToDestList[msg.Stop][msg.Destination].push(record);
+            schedules[num - 1][dir].push(record);
+          }
         });
       }
     });
@@ -86,48 +90,6 @@
    * Render the locations on the page, and update countdowns
    */
   function draw () {
-    // var outerPanel = d3.select('#accordion')
-    //     .selectAll('div')
-    //     .data(
-    //       schedules.filter(function (d) { return d.inbound.length || d.outbound.length; }),
-    //       function (d) { return d.name; }
-    //     );
-
-    // var newOuterPanel = outerPanel
-    //     .enter()
-    //   .append('div')
-    //     .call(bootstrapCollapsePanel(function (d) { return d.index; }, function (d) { return d.name; }));
-
-    // var body = newOuterPanel.selectAll('.panel-body');
-    // body.append('div')
-    //     .attr('class', 'col-sm-6 inbound')
-    //   .append('h4')
-    //     .text('Inbound');
-    // body.append('div')
-    //     .attr('class', 'col-sm-6 outbound')
-    //   .append('h4')
-    //     .text('Outbound');
-
-    // // outerPanel.exit().remove();
-
-
-    // function renderTrains(dir) {
-    //   var trains = d3.selectAll('.panel-body .' + dir).selectAll('p')
-    //       .data(function (d) { return d[dir]; }, function (d) { return d.id; })
-    //       .sort(function (a, b) {
-    //         return d3.ascending(a.order, b.order) || d3.ascending(a.time, b.time);
-    //       })
-    //       .text(function (d) { return d.stop + ': ' + moment(d.time).fromNow(); });
-
-    //   trains.enter()
-    //     .append('p')
-    //       .text(function (d) { return d.stop + ': ' + moment(d.time).fromNow(); });
-
-    //   trains.exit().remove();
-    // }
-
-    // renderTrains('inbound');
-    // renderTrains('outbound');
 
     var closeSections = d3.select('#closest').selectAll('.close-station')
         .data(closest, function (d) { return d.name + d.dist; });
@@ -169,19 +131,19 @@
     times.enter().append('dd')
         .attr('class', 'time');
     times.exit().remove();
-    displays.selectAll('.time').text(function (d) {
+    displays.selectAll('.time').html(function (d) {
       var diff = moment(d.time).fromNow();
+      var dist = distance(d.pos, stopLocations[d.stop]);
       if (d.flag === 'arr') {
-        var dist = distance(d.pos, stopLocations[d.stop]);
         var movingAway = !isApproaching(d.pos, stopLocations[d.stop], d.heading);
         return (dist > 0.1 && movingAway ? 'left station' : 'boarding now');
       } else if (d.flag === 'app') {
-        return 'approaching station';
+        return 'approaching station <small>' + humanizeDistance(dist) + ' from station</small>';
       }
       if (d.lateness) {
         diff += " (" + moment.duration(d.lateness, 'seconds').humanize() + " late)";
       }
-      return diff;
+      return diff + (d.pos[0] ? (" <small>" + humanizeDistance(dist) + " from station</small>") : "");
     }).attr('class', function (d) {
       return 'time ' + d.flag;
     });
@@ -189,9 +151,7 @@
 
     d3.selectAll('.distance')
         .text(function (d) {
-          var miles = Math.round(d.dist * 10) / 10;
-          var feet = Math.round(d.dist * 5280 / 10) * 10;
-          return feet <= 1000 ? (feet + " ft") : (miles + " mi");
+          return humanizeDistance(d.dist, true);
         });
   }
 
@@ -206,6 +166,13 @@
     d.dir = dir;
     stopLocations[stop] = [+d.stop_lat, +d.stop_lon];
   });
+
+  function humanizeDistance(dist, allowFeet) {
+    var multiplier = dist > 5 ? 1 : 10;
+    var miles = Math.round(dist * multiplier) / multiplier;
+    var feet = Math.round(dist * 5280 / multiplier) * multiplier;
+    return (allowFeet && feet) <= 1000 ? (feet + " ft") : (miles + " mi");
+  }
 
   function plotCoord(p) {
     var location = [p.coords.latitude, p.coords.longitude];
